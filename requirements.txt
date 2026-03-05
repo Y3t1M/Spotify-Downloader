@@ -1,0 +1,7 @@
+# Runtime dependencies
+# Install with: pip install -r requirements.txt
+
+mutagen>=1.47       # MP3 tag reading/writing (fix_tags.py only)
+
+# External tools (install via Homebrew or your package manager):
+#   brew install yt-dlp ffmpeg

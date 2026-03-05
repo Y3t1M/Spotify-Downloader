@@ -23,6 +23,21 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 OUTPUT_ROOT    = os.path.expanduser("~/Music/SpotifyDownloads")
 UNFINDABLE_LOG = os.path.join(OUTPUT_ROOT, "unfindable.txt")
 
+
+# ─── m3u8 builder (mirrors download_all_ytdlp.py) ────────────────────────────
+
+def build_m3u8(output_dir, name):
+    """Rebuild the .m3u8 at OUTPUT_ROOT level after retries add new MP3s."""
+    mp3s        = sorted(f for f in os.listdir(output_dir) if f.endswith(".mp3"))
+    folder_name = os.path.basename(output_dir)
+    path        = os.path.join(OUTPUT_ROOT, f"{name}.m3u8")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("#EXTM3U\n")
+        for mp3 in mp3s:
+            rel = f"{folder_name}/{mp3}"
+            f.write(f"#EXTINF:-1,{os.path.splitext(mp3)[0]}\n{rel}\n")
+    return path
+
 # ─── Worker count ─────────────────────────────────────────────────────────────
 # Lower than the main script — retry queries are more expensive (tries 3 results)
 
@@ -165,7 +180,7 @@ def collect_failures():
 
 # ─── Retry worker ─────────────────────────────────────────────────────────────
 
-def retry_one(item, lock, counters, total):
+def retry_one(item, lock, counters, total, rebuilt_playlists=None):
     artist     = html_module.unescape(item["artist"])
     title      = html_module.unescape(item["title"])
     output_dir = item["output_dir"]
@@ -202,6 +217,8 @@ def retry_one(item, lock, counters, total):
                     counters["ok"]   += 1
                     counters["done"] += 1
                     emit("ok", f"{artist} - {title}")
+                    if rebuilt_playlists is not None:
+                        rebuilt_playlists.add(playlist)
                 with open(log_path, "a") as lf:
                     lf.write(f"OK (retry) {artist} - {title}\n")
                 return
@@ -249,12 +266,16 @@ def main():
     # Clear unfindable log
     open(UNFINDABLE_LOG, "w").close()
 
-    counters = {"ok": 0, "fail": 0, "skip": 0, "done": 0}
-    lock     = threading.Lock()
+    counters          = {"ok": 0, "fail": 0, "skip": 0, "done": 0}
+    lock              = threading.Lock()
+    rebuilt_playlists = set()   # playlist names that got ≥1 new MP3
 
     print()
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        futures = [executor.submit(retry_one, item, lock, counters, total) for item in failures]
+        futures = [
+            executor.submit(retry_one, item, lock, counters, total, rebuilt_playlists)
+            for item in failures
+        ]
         for f in as_completed(futures):
             f.result()
 
@@ -268,6 +289,16 @@ def main():
 
     if counters["fail"] > 0:
         print(f"\n  Unfindable list → {c(DIM, UNFINDABLE_LOG)}")
+
+    # Rebuild m3u8 for every playlist that got new tracks
+    if rebuilt_playlists:
+        print(f"\n  {c(BOLD, 'Rebuilding playlists…')}")
+        for pl_name in sorted(rebuilt_playlists):
+            pl_dir = os.path.join(OUTPUT_ROOT, pl_name)
+            if os.path.isdir(pl_dir):
+                path = build_m3u8(pl_dir, pl_name)
+                print(f"  {c(GREEN, '✓')} {pl_name}.m3u8  ({c(DIM, path)})")
+        print()
     print()
 
 

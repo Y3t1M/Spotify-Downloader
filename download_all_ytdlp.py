@@ -3,7 +3,7 @@
 Spotify → YouTube Music Downloader
 ────────────────────────────────────
 No Spotify API key needed.
-• Scrapes public Spotify track pages for title + artist
+• Fetches track titles via the public Spotify oEmbed API
 • Searches YouTube for the best match via yt-dlp
 • Downloads as MP3 with embedded metadata and album art
 • Builds a .m3u8 playlist per playlist when done
@@ -14,6 +14,7 @@ import os
 import re
 import sys
 import time
+import json
 import subprocess
 import urllib.request
 import threading
@@ -126,20 +127,25 @@ def load_playlists(path):
 # ─── Spotify scraper ──────────────────────────────────────────────────────────
 
 def scrape_track_info(spotify_url):
-    """Return (title, artist) from a public Spotify track page, or (None, None)."""
-    try:
-        req  = urllib.request.Request(spotify_url, headers={"User-Agent": UA})
-        html = urllib.request.urlopen(req, timeout=15).read().decode("utf-8", errors="ignore")
-        t_m  = re.search(r'<meta property="og:title" content="([^"]+)"', html)
-        d_m  = re.search(r'<meta property="og:description" content="([^"]+)"', html)
-        if not t_m:
+    """Return (title, artist) via Spotify oEmbed API (no auth needed).
+    Retries on 429 with exponential backoff."""
+    oembed_url = f"https://open.spotify.com/oembed?url={spotify_url}"
+    for attempt in range(4):
+        try:
+            req  = urllib.request.Request(oembed_url, headers={"User-Agent": UA})
+            data = json.loads(urllib.request.urlopen(req, timeout=15).read().decode("utf-8"))
+            title = html_module.unescape(data.get("title", ""))
+            if not title:
+                return None, None
+            return title, ""
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt < 3:
+                time.sleep(5 * (attempt + 1))
+                continue
             return None, None
-        title  = html_module.unescape(t_m.group(1))
-        parts  = d_m.group(1).split(" · ") if d_m else []
-        artist = html_module.unescape(parts[0]) if parts else ""
-        return title, artist
-    except Exception:
-        return None, None
+        except Exception:
+            return None, None
+    return None, None
 
 
 # ─── YouTube search ───────────────────────────────────────────────────────────
@@ -201,12 +207,14 @@ def download_track(yt_url, output_dir, retries=2):
 
 def build_m3u8(output_dir, name):
     """
-    Build an m3u8 with paths relative to OUTPUT_ROOT so Navidrome can resolve them.
-    e.g.  Country/Alabama - Dixieland Delight.mp3
+    Build an m3u8 saved at OUTPUT_ROOT level with paths relative to OUTPUT_ROOT.
+    Navidrome resolves entries relative to the playlist file's own location, so
+    the playlist must live at the root and entries look like:
+        Country/Alabama - Dixieland Delight.mp3
     """
     mp3s        = sorted(f for f in os.listdir(output_dir) if f.endswith(".mp3"))
     folder_name = os.path.basename(output_dir)
-    path        = os.path.join(output_dir, f"{name}.m3u8")
+    path        = os.path.join(OUTPUT_ROOT, f"{name}.m3u8")
     with open(path, "w", encoding="utf-8") as f:
         f.write("#EXTM3U\n")
         for mp3 in mp3s:
@@ -228,6 +236,9 @@ def process_playlist(playlist, workers):
     counters = {"ok": 0, "fail": 0, "skip": 0, "done": 0}
     lock     = threading.Lock()
 
+    # Clear log so stale failures from previous runs don't accumulate
+    open(log_path, "w").close()
+
     section_header(name, total)
 
     def emit(status, label):
@@ -237,12 +248,30 @@ def process_playlist(playlist, workers):
             status, label
         )
 
+    # ── Phase 1: Fetch Spotify metadata sequentially (avoids oEmbed 429s) ──
+    print(f"  {c(DIM, 'Fetching track info…')}", flush=True)
+    meta = {}  # spotify_url → (title, artist) or None
+    for i, spotify_url in enumerate(track_urls):
+        track_id    = spotify_url.rstrip("/").split("/")[-1].split("?")[0]
+        done_marker = os.path.join(output_dir, f".done_{track_id}")
+        if os.path.exists(done_marker):
+            meta[spotify_url] = ("__cached__", "")
+            continue
+        title, artist = scrape_track_info(spotify_url)
+        meta[spotify_url] = (title, artist) if title else None
+        if (i + 1) % 10 == 0:
+            print(f"  {c(DIM, f'  {i+1}/{total} fetched…')}", flush=True)
+        time.sleep(0.5)   # ~2 req/s — safely under Spotify oEmbed rate limit
+
+    print(f"\r\033[K", end="", flush=True)  # clear fetch status line
+
     def process_one(spotify_url):
         track_id    = spotify_url.rstrip("/").split("/")[-1].split("?")[0]
         done_marker = os.path.join(output_dir, f".done_{track_id}")
+        info        = meta.get(spotify_url)
 
         # ── Already completed ──
-        if os.path.exists(done_marker):
+        if info and info[0] == "__cached__":
             with lock:
                 counters["ok"]   += 1
                 counters["skip"] += 1
@@ -250,19 +279,19 @@ def process_playlist(playlist, workers):
                 emit("skip", "cached")
             return
 
-        # ── Scrape Spotify ──
-        title, artist = scrape_track_info(spotify_url)
-        if not title:
+        # ── Scrape failed ──
+        if info is None:
             with lock:
                 counters["fail"] += 1
                 counters["done"] += 1
                 emit("fail", track_id)
-                print()  # persist fail line
+                print()
                 with open(log_path, "a") as lf:
                     lf.write(f"FAIL (scrape) {spotify_url}\n")
             return
 
-        label = f"{artist} - {title}"
+        title, artist = info
+        label = f"{artist} - {title}" if artist else title
 
         # ── Check if MP3 already on disk ──
         safe = title.lower()[:20]
