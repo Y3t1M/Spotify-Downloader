@@ -1,0 +1,27 @@
+# Your personal playlist URLs — do not commit
+playlists/playlists.txt
+
+# Downloaded music — way too large for git
+~/Music/SpotifyDownloads/
+
+# Navidrome data directory
+~/navidrome/
+
+# Tag fixer logs
+fix_tags_log.txt
+unfindable.txt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# VS Code
+.vscode/

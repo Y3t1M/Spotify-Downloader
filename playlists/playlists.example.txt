@@ -1,0 +1,34 @@
+# playlists.txt — your Spotify track URLs
+#
+# Format:
+#   Playlist Name        ← plain text, one line
+#   https://open.spotify.com/track/<id>
+#   https://open.spotify.com/track/<id>
+#   ...
+#
+#   Next Playlist Name
+#   https://open.spotify.com/track/<id>
+#   ...
+#
+# How to get URLs:
+#   1. Open Spotify (desktop or web)
+#   2. Right-click any song → Share → Copy Song Link
+#      e.g. https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC
+#   3. Paste one URL per line under the playlist name
+#
+# Tips:
+#   • spotify:local/ lines are automatically skipped (local files)
+#   • Blank lines between playlists are fine
+#   • You can have as many playlists as you want
+#
+# Copy this file to playlists.txt and fill in your own URLs.
+
+My Playlist
+https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC
+https://open.spotify.com/track/0nJW01T7XtvILxQgC5J7Wh
+https://open.spotify.com/track/1BECwm5qkaBwlbfo4kpYx8
+
+Road Trip
+https://open.spotify.com/track/7FIWs0pqAYbP91WWM0vlTQ
+https://open.spotify.com/track/3AJwUDP919kvQ9QcozQPxg
+https://open.spotify.com/track/2takcwOaAZWiXQijPHIx7B
