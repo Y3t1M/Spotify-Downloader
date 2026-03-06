@@ -242,7 +242,8 @@ def screen_playlist_list(playlists):
         print(f"  {dim('No playlists configured yet.')}\n")
     else:
         for i, pl in enumerate(playlists):
-            print(f"  {c(CYAN, str(i + 1)):>4}.  {bold(pl['name'])}  {dim(f'({len(pl[\"urls\"]):,} tracks)')}")
+            n, t = pl['name'], len(pl['urls'])
+            print(f"  {c(CYAN, str(i + 1)):>4}.  {bold(n)}  {dim(f'({t:,} tracks)')}")
         print()
 
     print(f"  {hi('a')}  Add new playlist")
@@ -292,7 +293,8 @@ def screen_edit_playlist(playlists):
 
     header("♫  Edit Playlist")
     for i, pl in enumerate(playlists):
-        print(f"  {c(CYAN, str(i + 1)):>4}.  {bold(pl['name'])}  {dim(f'({len(pl[\"urls\"]):,} tracks)')}")
+        n, t = pl['name'], len(pl['urls'])
+        print(f"  {c(CYAN, str(i + 1)):>4}.  {bold(n)}  {dim(f'({t:,} tracks)')}")
     print()
 
     raw = prompt("Playlist number (or blank to cancel)")
@@ -308,7 +310,8 @@ def screen_edit_playlist(playlists):
         return playlists
 
     pl = playlists[idx]
-    print(f"\n  Editing: {bold(pl['name'])}  {dim(f'({len(pl[\"urls\"]):,} tracks currently)')}")
+    n, t = pl['name'], len(pl['urls'])
+    print(f"\n  Editing: {bold(n)}  {dim(f'({t:,} tracks currently)')}")
     print()
     print(f"  {hi('r')}  Replace all URLs  {dim('(paste a fresh list)')}")
     print(f"  {hi('a')}  Append URLs       {dim('(add to existing list)')}")
@@ -354,7 +357,8 @@ def screen_delete_playlist(playlists):
 
     header("♫  Delete Playlist")
     for i, pl in enumerate(playlists):
-        print(f"  {c(CYAN, str(i + 1)):>4}.  {bold(pl['name'])}  {dim(f'({len(pl[\"urls\"]):,} tracks)')}")
+        n, t = pl['name'], len(pl['urls'])
+        print(f"  {c(CYAN, str(i + 1)):>4}.  {bold(n)}  {dim(f'({t:,} tracks)')}")
     print()
 
     raw = prompt("Playlist number to delete (or blank to cancel)")
@@ -391,7 +395,8 @@ def screen_summary(cfg, playlists):
     if playlists:
         print(f"  {bold('Playlists')}  {dim(f'({len(playlists)} total, {total_tracks:,} tracks)')}")
         for pl in playlists:
-            print(f"    {ok('•')} {pl['name']}  {dim(f'({len(pl[\"urls\"]):,} tracks)')}")
+            n, t = pl['name'], len(pl['urls'])
+            print(f"    {ok('•')} {n}  {dim(f'({t:,} tracks)')}")
     else:
         print(f"  {warn('No playlists configured yet.')}")
     print()
@@ -421,7 +426,8 @@ def main():
         rule("─", 40, DIM)
         total = sum(len(p["urls"]) for p in playlists)
         print(f"  {hi('1')}  Playlists        {dim(f'({len(playlists)} playlists, {total:,} tracks)')}")
-        print(f"  {hi('2')}  Settings         {dim(f'(output: {cfg[\"output_dir\"]}  workers: {cfg[\"workers\"]})')}")
+        out, wrk = cfg['output_dir'], cfg['workers']
+        print(f"  {hi('2')}  Settings         {dim(f'(output: {out}  workers: {wrk})')}")
         print(f"  {hi('3')}  Show summary")
         print(f"  {hi('q')}  Quit")
         print()
