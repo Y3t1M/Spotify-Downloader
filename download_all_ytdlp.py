@@ -25,7 +25,21 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 SCRIPT_DIR    = os.path.dirname(os.path.abspath(__file__))
 PLAYLISTS_TXT = os.path.join(SCRIPT_DIR, "playlists", "playlists.txt")
-OUTPUT_ROOT   = os.path.expanduser("~/Music/SpotifyDownloads")
+_CONFIG_PATH  = os.path.join(SCRIPT_DIR, "config.json")
+
+# ─── Load config.json (written by setup.py) ───────────────────────────────────
+
+def _load_config():
+    if os.path.exists(_CONFIG_PATH):
+        try:
+            with open(_CONFIG_PATH) as _f:
+                return json.load(_f)
+        except Exception:
+            pass
+    return {}
+
+_cfg        = _load_config()
+OUTPUT_ROOT = os.path.expanduser(_cfg.get("output_dir", "~/Music/SpotifyDownloads"))
 
 # ─── Worker count ─────────────────────────────────────────────────────────────
 # Auto-detects CPU cores. Recommended = ~1.5× CPU count (sweet spot before
@@ -34,7 +48,7 @@ OUTPUT_ROOT   = os.path.expanduser("~/Music/SpotifyDownloads")
 
 _cpu_count          = os.cpu_count() or 4
 RECOMMENDED_WORKERS = min(max(_cpu_count + (_cpu_count // 2), 4), 20)
-WORKERS             = RECOMMENDED_WORKERS
+WORKERS             = int(_cfg.get("workers", RECOMMENDED_WORKERS))
 
 # ─── HTTP user-agent ──────────────────────────────────────────────────────────
 

@@ -12,6 +12,7 @@ Run this after the main script finishes.
 
 import os
 import re
+import json
 import time
 import subprocess
 import html as html_module
@@ -20,7 +21,20 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # ─── Paths ────────────────────────────────────────────────────────────────────
 
-OUTPUT_ROOT    = os.path.expanduser("~/Music/SpotifyDownloads")
+_SCRIPT_DIR  = os.path.dirname(os.path.abspath(__file__))
+_CONFIG_PATH = os.path.join(_SCRIPT_DIR, "config.json")
+
+def _load_config():
+    if os.path.exists(_CONFIG_PATH):
+        try:
+            with open(_CONFIG_PATH) as _f:
+                return json.load(_f)
+        except Exception:
+            pass
+    return {}
+
+_cfg           = _load_config()
+OUTPUT_ROOT    = os.path.expanduser(_cfg.get("output_dir", "~/Music/SpotifyDownloads"))
 UNFINDABLE_LOG = os.path.join(OUTPUT_ROOT, "unfindable.txt")
 
 
@@ -43,7 +57,7 @@ def build_m3u8(output_dir, name):
 
 _cpu_count          = os.cpu_count() or 4
 RECOMMENDED_WORKERS = min(max(_cpu_count, 4), 12)
-WORKERS             = RECOMMENDED_WORKERS
+WORKERS             = int(_cfg.get("workers", RECOMMENDED_WORKERS))
 
 # ─── Colours ──────────────────────────────────────────────────────────────────
 
